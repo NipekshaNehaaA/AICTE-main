@@ -13,6 +13,7 @@ import { committeeRouter, committeeSubmissionRouter } from './routes/committee.t
 import { regionRouter } from './routes/region.ts';
 import { reportsRouter } from './routes/reports.ts';
 import { inspectionRouter } from './routes/inspection.ts';
+import { copilotRouter } from './routes/copilot.ts';
 import type { Storage } from './storage.ts';
 
 export interface AppOptions {
@@ -66,6 +67,7 @@ export function createApp({ db, storage, secureCookies = false, silent = false, 
   api.use(catalogueRouter());
   api.use(requireAuth);
   api.use(sharedRouter(db, storage));
+  api.use('/copilot', copilotRouter(db));
   api.use('/rules', rulesRouter(db));
   api.use('/official', officialRouter(db, storage));
   api.use('/evc/scheduler', schedulerRouter(db));

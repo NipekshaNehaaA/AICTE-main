@@ -15,7 +15,12 @@ const prod = process.env.NODE_ENV === 'production';
 async function main() {
   const db = await createDb({ databaseUrl: process.env.DATABASE_URL || undefined, dataDir: process.env.PGLITE_DATA_DIR ?? path.join(root, 'data', 'pgdata') });
   const applied = await migrate(db);
-  const seeded = process.env.SEED_DEMO === 'false' ? null : await seed(db);
+    const seeded = process.env.SEED_DEMO === 'false' ? null : await seed(db);
+  if (process.env.RESET_TOTP_ON_START === 'true') {
+    await db.query('UPDATE users SET totp_enabled = false, totp_secret = NULL');
+    await db.query('DELETE FROM totp_challenges');
+    console.log('[Auth] All demo accounts reset: Fresh QR code setup enabled.');
+  }
   const storage = new LocalStorage(process.env.STORAGE_DIR ?? path.join(root, 'data', 'storage'));
   const { app, log } = createApp({ db, storage, secureCookies: prod });
   log('startup', { database: db.kind, migrationsApplied: applied, seeded });

@@ -37,6 +37,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { initialsOf, WORKSPACE_NAME } from '../lib/roles';
 import { cx } from './ui';
+import { CopilotDrawer } from './CopilotDrawer';
 
 interface NavItem {
   to: string;
@@ -343,7 +344,12 @@ export function InstitutionLayout() {
     },
     { title: 'Updates', items: [{ to: '/notifications', label: 'Notifications', icon: Bell, badge: counts.unread }] },
   ];
-  return <Shell groups={groups} homePath="/" searchPath="/applications" unread={counts.unread} />;
+  return (
+    <>
+      <Shell groups={groups} homePath="/" searchPath="/applications" unread={counts.unread} />
+      <CopilotDrawer />
+    </>
+  );
 }
 
 const COMMITTEE_ROLES = ['EC_OFFICIAL', 'SHC_MEMBER', 'SAC_MEMBER', 'COUNCIL_OFFICIAL'];

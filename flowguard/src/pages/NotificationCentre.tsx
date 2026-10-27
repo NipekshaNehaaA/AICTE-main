@@ -1,4 +1,4 @@
-import { ArrowUpRight, Bell, CheckCheck, Clock, FileText, Repeat, ShieldCheck, UserCheck } from 'lucide-react';
+import { ArrowUpRight, Bell, CheckCheck, Clock, FileText, Mail, MessageSquare, Repeat, ShieldCheck, UserCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Badge, Button, Card, CardHeader, cx, Empty, PageHeader, PageNote, Pager, Spinner, Tabs, usePaged } from '../components/ui';
@@ -28,6 +28,23 @@ export function Notifications() {
   const nav = useNavigate();
   const [tab, setTab] = useState<'all' | 'unread' | Kind>('all');
   const [selId, setSelId] = useState<string | null>(null);
+  const [testSent, setTestSent] = useState<string | null>(null);
+  const [sendingTest, setSendingTest] = useState(false);
+
+  async function handleSendTestAlert() {
+    setSendingTest(true);
+    setTestSent(null);
+    try {
+      const res = await api.post('/api/notifications/test-alert');
+      setTestSent(`Live statutory alert dispatched to your Email (Resend) and WhatsApp (Twilio)! Check your inbox & phone.`);
+      setTimeout(() => reload(), 1000);
+    } catch (e: any) {
+      alert(e.message || 'Failed to send alert');
+    } finally {
+      setSendingTest(false);
+    }
+  }
+
   const role = user?.activeRole ?? '';
   const institution = role === 'INSTITUTION_APPLICANT';
   const all: any[] = useMemo(() => (data?.notifications ?? []).map((n: any) => ({ ...n, kind: kindOf(n.event_type) })), [data]);
@@ -49,13 +66,25 @@ export function Notifications() {
       <PageHeader
         crumbs={['Workspace', 'Notifications']}
         title="Notification centre"
-        subtitle="One inbox for application updates, assignments and reminders."
+        subtitle="One inbox for application updates, assignments, reminders, and live email dispatches."
         action={
-          <Button variant="secondary" disabled={!data?.unread} onClick={async () => { await api.post('/api/notifications/read-all'); reload(); }}>
-            <CheckCheck className="h-4 w-4" /> Mark all as read
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" onClick={handleSendTestAlert} loading={sendingTest}>
+              <Bell className="h-4 w-4 text-brand-600" /> Send Live Alert (Email + WhatsApp)
+            </Button>
+            <Button variant="secondary" disabled={!data?.unread} onClick={async () => { await api.post('/api/notifications/read-all'); reload(); }}>
+              <CheckCheck className="h-4 w-4" /> Mark all as read
+            </Button>
+          </div>
         }
       />
+      {testSent && (
+        <div className="mb-4">
+          <Alert kind="success">
+            {testSent}
+          </Alert>
+        </div>
+      )}
       <Tabs
         className="mb-6"
         value={tab}
@@ -94,7 +123,19 @@ export function Notifications() {
                         <span className="min-w-0 flex-1">
                           <span className={cx('block truncate text-sm', n.read_at ? 'font-medium text-slate-700' : 'font-semibold text-slate-900')}>{n.title}</span>
                           <span className="mt-0.5 block truncate text-[13px] text-slate-500">{[!institution && n.institution_name, n.message].filter(Boolean).join(' · ')}</span>
-                          {n.reference_no && <span className="mt-1 block font-mono text-xs text-brand-700">{n.reference_no}</span>}
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            {n.reference_no && <span className="font-mono text-xs text-brand-700">{n.reference_no}</span>}
+                            {n.email_sent && (
+                              <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[11px] font-medium text-blue-700">
+                                <Mail className="h-3 w-3" /> Email sent
+                              </span>
+                            )}
+                            {n.whatsapp_sent && (
+                              <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700">
+                                <MessageSquare className="h-3 w-3" /> WhatsApp sent
+                              </span>
+                            )}
+                          </div>
                         </span>
                         <span className="flex shrink-0 flex-col items-end justify-between gap-2">
                           <span className={cx('h-2 w-2 rounded-full', n.read_at ? 'bg-transparent' : 'bg-brand-600')} aria-label={n.read_at ? undefined : 'Unread'} />
@@ -116,7 +157,19 @@ export function Notifications() {
                 <p className="px-5 py-4 text-sm text-slate-500">Select a notification.</p>
               ) : (
                 <div className="space-y-4 p-5">
-                  <Badge t={sel.kind === 'REMINDER' ? 'amber' : 'slate'}>{KIND[sel.kind as Kind].label}</Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge t={sel.kind === 'REMINDER' ? 'amber' : 'slate'}>{KIND[sel.kind as Kind].label}</Badge>
+                    {sel.email_sent && (
+                      <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-200">
+                        <Mail className="h-3.5 w-3.5" /> Delivered to Email (Resend)
+                      </span>
+                    )}
+                    {sel.whatsapp_sent && (
+                      <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200">
+                        <MessageSquare className="h-3.5 w-3.5" /> Delivered to WhatsApp (Twilio)
+                      </span>
+                    )}
+                  </div>
                   <h2 className="text-lg leading-snug font-semibold text-slate-900">{sel.title}</h2>
                   <p className="text-sm whitespace-pre-wrap text-slate-600">{sel.message}</p>
                   {(sel.reference_no || sel.institution_name) && (

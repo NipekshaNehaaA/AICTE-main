@@ -20,6 +20,7 @@ export interface AuthUser {
   loginId: string;
   fullName: string;
   email: string;
+  phone?: string | null;
   designation: string | null;
   roles: Role[];
   activeRole: Role;

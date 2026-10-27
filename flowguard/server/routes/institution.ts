@@ -963,6 +963,21 @@ export function sharedRouter(db: Db, storage: Storage) {
       res.json({ ok: true });
     }),
   );
+  r.post(
+    '/notifications/test-alert',
+    ah(async (req, res) => {
+      const u = user(req);
+      const { notify } = await import('../notify.ts');
+      const id = await notify(db, {
+        recipientUserId: u.id,
+        eventType: 'LIVE_DEMO_ALERT',
+        title: 'AICTE Alert: Deficiency Correction Due in 3 Days (Live Demo)',
+        message: 'Deficiency DEF-001 (Building Plan Approval & Occupancy Certificate) has an APH-prescribed deadline of 30-Apr-2026. This alert was triggered live from the AICTE FlowGuard Portal.',
+        dedupeKey: `demo:test:${Date.now()}`,
+      });
+      res.json({ ok: true, notificationId: id, email: u.email });
+    }),
+  );
   return r;
 }
 

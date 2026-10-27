@@ -35,6 +35,8 @@ async function attemptDelivery(db: Db, n: NotifyInput): Promise<string | null> {
   }
 }
 
+import { dispatchExternalAlerts } from './alerts.ts';
+
 /** Returns the notification id, or null when it was a duplicate. */
 export async function notify(db: Db, n: NotifyInput): Promise<string | null> {
   const err = await attemptDelivery(db, n);
@@ -44,6 +46,19 @@ export async function notify(db: Db, n: NotifyInput): Promise<string | null> {
      ON CONFLICT (recipient_user_id, dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING RETURNING id`,
     [n.recipientUserId, n.institutionId ?? null, n.applicationId ?? null, n.eventType, n.title, n.message, n.dedupeKey ?? null, err ? 'FAILED' : 'DELIVERED', err, err ? null : new Date().toISOString()],
   );
+  if (row?.id && !err) {
+    dispatchExternalAlerts(db, n)
+      .then(async (res) => {
+        if (res.emailSent || res.whatsappSent) {
+          await db.query('UPDATE notifications SET email_sent = $2, whatsapp_sent = $3 WHERE id = $1', [
+            row.id,
+            res.emailSent,
+            res.whatsappSent,
+          ]).catch(() => undefined);
+        }
+      })
+      .catch((e) => console.error('[Alert Dispatch Error]', e));
+  }
   return row?.id ?? null;
 }
 
