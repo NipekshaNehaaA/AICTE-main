@@ -10,13 +10,20 @@ export interface SessionUser {
   roles: string[];
   activeRole: string;
 }
-type Workspace = 'INSTITUTION' | 'OFFICIAL' | 'GOVERNANCE';
+
+export type Workspace = 'INSTITUTION' | 'OFFICIAL' | 'GOVERNANCE';
+
+export type LoginResult =
+  | { success: true; workspace: Workspace }
+  | { requireTotp: true; challengeToken: string; loginId: string; fullName: string }
+  | { requireTotpSetup: true; challengeToken: string; secret: string; qrCodeDataUrl: string; loginId: string; fullName: string };
 
 interface AuthState {
   user: SessionUser | null;
   workspace: Workspace | null;
   ready: boolean;
-  login: (loginId: string, password: string) => Promise<Workspace>;
+  login: (loginId: string, password: string) => Promise<LoginResult>;
+  verifyTotp: (challengeToken: string, code: string) => Promise<Workspace>;
   logout: () => Promise<void>;
   switchRole: (role: string) => Promise<void>;
 }
@@ -45,24 +52,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('fg:unauthenticated', onUnauth);
   }, []);
 
-  const login = useCallback(async (loginId: string, password: string) => {
+  const login = useCallback(async (loginId: string, password: string): Promise<LoginResult> => {
     const r = await api.post('/api/auth/login', { loginId, password });
+    if (r.requireTotp) {
+      return {
+        requireTotp: true,
+        challengeToken: r.challengeToken,
+        loginId: r.loginId,
+        fullName: r.fullName,
+      };
+    }
+    if (r.requireTotpSetup) {
+      return {
+        requireTotpSetup: true,
+        challengeToken: r.challengeToken,
+        secret: r.secret,
+        qrCodeDataUrl: r.qrCodeDataUrl,
+        loginId: r.loginId,
+        fullName: r.fullName,
+      };
+    }
+    setUser(r.user);
+    setWorkspace(r.workspace);
+    return { success: true, workspace: r.workspace as Workspace };
+  }, []);
+
+  const verifyTotp = useCallback(async (challengeToken: string, code: string): Promise<Workspace> => {
+    const r = await api.post('/api/auth/verify-totp', { challengeToken, code });
     setUser(r.user);
     setWorkspace(r.workspace);
     return r.workspace as Workspace;
   }, []);
+
   const logout = useCallback(async () => {
     await api.post('/api/auth/logout').catch(() => undefined);
     setUser(null);
     setWorkspace(null);
   }, []);
+
   const switchRole = useCallback(async (role: string) => {
     const r = await api.post('/api/auth/switch-role', { role });
     setUser(r.user);
     setWorkspace(r.workspace);
   }, []);
 
-  return <Ctx.Provider value={{ user, workspace, ready, login, logout, switchRole }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, workspace, ready, login, verifyTotp, logout, switchRole }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth() {
